@@ -1,5 +1,7 @@
 #![feature(generic_const_exprs)]
 
+pub mod analyze;
+pub mod fft;
 pub mod peak;
 
 /// Returns the size of each bin when dividing the frequency range from
