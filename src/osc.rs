@@ -1,13 +1,13 @@
 use std::f32::consts::PI;
 
-struct SinOsc {
+pub struct SinOsc {
     frequency: f32, // radians per sample
     amplitude: f32,
     phase: f32,
 }
 
 impl SinOsc {
-    fn new(frequency: f32, amplitude: f32, phase: f32) -> Self {
+    pub fn new(frequency: f32, amplitude: f32, phase: f32) -> Self {
         Self {
             frequency,
             amplitude,
@@ -15,19 +15,19 @@ impl SinOsc {
         }
     }
 
-    fn set_frequency(&mut self, frequency: f32) {
+    pub fn set_frequency(&mut self, frequency: f32) {
         self.frequency = frequency;
     }
 
-    fn set_frequency_hz(&mut self, hz: f32, sample_rate: f32) {
+    pub fn set_frequency_hz(&mut self, hz: f32, sample_rate: f32) {
         self.frequency = 2.0 * PI * hz / sample_rate;
     }
 
-    fn set_amplitude(&mut self, amplitude: f32) {
+    pub fn set_amplitude(&mut self, amplitude: f32) {
         self.amplitude = amplitude;
     }
 
-    fn next(&mut self) -> f32 {
+    pub fn next(&mut self) -> f32 {
         let phase = self.phase;
         self.phase += self.frequency;
         f32::sin(phase) * self.amplitude

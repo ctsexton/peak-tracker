@@ -18,9 +18,9 @@ pub fn apply_hanning_window<const SIZE: usize>(
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Peak {
-    frequency: f32,
-    amplitude: f32,
+pub struct Peak {
+    pub frequency: f32,
+    pub amplitude: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -139,7 +139,7 @@ where
     matches
 }
 
-struct PeakAnalyzer {
+pub struct PeakAnalyzer {
     plan: std::sync::Arc<dyn RealToComplex<f32>>,
     fft_input: Vec<f32>,
     fft_scratch: Vec<Complex<f32>>,
@@ -147,7 +147,7 @@ struct PeakAnalyzer {
 }
 
 impl PeakAnalyzer {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let mut planner = RealFftPlanner::<f32>::new();
         let plan = planner.plan_fft_forward(1024);
         let fft_input = plan.make_input_vec();
@@ -161,7 +161,7 @@ impl PeakAnalyzer {
         }
     }
 
-    fn get_raw_peaks(&mut self, input: &[f32; 512]) -> [Option<Peak>; 20] {
+    pub fn get_raw_peaks(&mut self, input: &[f32; 512]) -> [Option<Peak>; 20] {
         assert_no_alloc(|| {
             for x in self.fft_input.iter_mut() {
                 *x = 0.0;
@@ -199,17 +199,17 @@ impl PeakAnalyzer {
     }
 }
 
-struct PeakTracker {
+pub struct PeakTracker {
     peaks: [Option<Peak>; 20],
 }
 
 impl PeakTracker {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let peaks = [None; 20];
         Self { peaks }
     }
 
-    fn update_peaks(&mut self, mut batch: [Option<Peak>; 20]) {
+    pub fn update_peaks(&mut self, mut batch: [Option<Peak>; 20]) {
         assert_no_alloc(|| {
             let matches = match_closest_peaks(&self.peaks, &batch);
             let mut new_peaks: [Option<Peak>; 20] = [None; 20];
