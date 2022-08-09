@@ -1,3 +1,4 @@
+use assert_no_alloc::assert_no_alloc;
 use dasp::frame::Mono;
 use dasp::signal::window::{hanning, Window};
 use dasp::window::Hanning;
@@ -161,38 +162,40 @@ impl PeakAnalyzer {
     }
 
     fn get_raw_peaks(&mut self, input: &[f32; 512]) -> [Option<Peak>; 20] {
-        for x in self.fft_input.iter_mut() {
-            *x = 0.0;
-        }
-        let window = hanning::<Mono<f32>>(512);
-        let windowed_input = apply_hanning_window::<512>(input, window);
-        let fft_frame = &mut self.fft_input[0..512];
-        for (x, y) in windowed_input.iter().zip(fft_frame.iter_mut()) {
-            *y = *x;
-        }
-        self.plan.process_with_scratch(
-            self.fft_input.as_mut_slice(),
-            self.fft_output.as_mut_slice(),
-            self.fft_scratch.as_mut_slice(),
-        );
-        let mut peak_bins = find_top_20_bins(self.fft_output.as_slice());
-        let mut peaks: [Option<Peak>; 20] = [None; 20];
-        let sample_rate = 48000.0;
-        let window_size = 512;
-        let freq_per_bin = 0.5 * sample_rate / window_size as f32;
-
-        for (peak, peak_bin_pair) in peaks.iter_mut().zip(peak_bins.iter()) {
-            if let Some((peak_bin, magnitude)) = peak_bin_pair {
-                let frequency =
-                    find_bin_freq_quadratic(self.fft_output.as_slice(), *peak_bin) * freq_per_bin;
-                let amplitude = *magnitude / 512.0_f32.sqrt() * 0.2;
-                *peak = Some(Peak {
-                    frequency,
-                    amplitude,
-                });
+        assert_no_alloc(|| {
+            for x in self.fft_input.iter_mut() {
+                *x = 0.0;
             }
-        }
-        peaks
+            let window = hanning::<Mono<f32>>(512);
+            let windowed_input = apply_hanning_window::<512>(input, window);
+            let fft_frame = &mut self.fft_input[0..512];
+            for (x, y) in windowed_input.iter().zip(fft_frame.iter_mut()) {
+                *y = *x;
+            }
+            self.plan.process_with_scratch(
+                self.fft_input.as_mut_slice(),
+                self.fft_output.as_mut_slice(),
+                self.fft_scratch.as_mut_slice(),
+            );
+            let mut peak_bins = find_top_20_bins(self.fft_output.as_slice());
+            let mut peaks: [Option<Peak>; 20] = [None; 20];
+            let sample_rate = 48000.0;
+            let window_size = 512;
+            let freq_per_bin = 0.5 * sample_rate / window_size as f32;
+
+            for (peak, peak_bin_pair) in peaks.iter_mut().zip(peak_bins.iter()) {
+                if let Some((peak_bin, magnitude)) = peak_bin_pair {
+                    let frequency = find_bin_freq_quadratic(self.fft_output.as_slice(), *peak_bin)
+                        * freq_per_bin;
+                    let amplitude = *magnitude / 512.0_f32.sqrt() * 0.2;
+                    *peak = Some(Peak {
+                        frequency,
+                        amplitude,
+                    });
+                }
+            }
+            peaks
+        })
     }
 }
 
@@ -207,22 +210,24 @@ impl PeakTracker {
     }
 
     fn update_peaks(&mut self, mut batch: [Option<Peak>; 20]) {
-        let matches = match_closest_peaks(&self.peaks, &batch);
-        let mut new_peaks: [Option<Peak>; 20] = [None; 20];
-        for (index, item) in matches.iter().enumerate() {
-            if let Some(target) = *item {
-                new_peaks[index] = batch[target].take();
+        assert_no_alloc(|| {
+            let matches = match_closest_peaks(&self.peaks, &batch);
+            let mut new_peaks: [Option<Peak>; 20] = [None; 20];
+            for (index, item) in matches.iter().enumerate() {
+                if let Some(target) = *item {
+                    new_peaks[index] = batch[target].take();
+                }
             }
-        }
-        let mut unmapped_peaks = batch.iter_mut().flatten();
-        for new_peak in new_peaks.iter_mut().filter(|p| p.is_none()) {
-            if let Some(peak) = unmapped_peaks.next() {
-                *new_peak = Some(*peak);
-            } else {
-                break;
+            let mut unmapped_peaks = batch.iter_mut().flatten();
+            for new_peak in new_peaks.iter_mut().filter(|p| p.is_none()) {
+                if let Some(peak) = unmapped_peaks.next() {
+                    *new_peak = Some(*peak);
+                } else {
+                    break;
+                }
             }
-        }
-        self.peaks = new_peaks;
+            self.peaks = new_peaks;
+        })
     }
 
     fn latest(&self) -> &[Option<Peak>; 20] {

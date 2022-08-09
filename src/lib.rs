@@ -4,6 +4,12 @@ pub mod analyze;
 pub mod fft;
 pub mod peak;
 
+use assert_no_alloc::*;
+
+#[cfg(debug_assertions)]
+#[global_allocator]
+static A: AllocDisabler = AllocDisabler;
+
 /// Returns the size of each bin when dividing the frequency range from
 /// 0 to the nyquist frequency by num_bins;
 /// ```
