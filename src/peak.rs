@@ -113,7 +113,7 @@ where
     distances.sort_unstable_by(|a, b| {
         if let (Some(a), Some(b)) = (a, b) {
             return a.distance.partial_cmp(&b.distance).unwrap();
-        } else if let Some(a) = a {
+        } else if let Some(_a) = a {
             return std::cmp::Ordering::Less;
         } else {
             return std::cmp::Ordering::Greater;
@@ -177,7 +177,7 @@ impl PeakAnalyzer {
                 self.fft_output.as_mut_slice(),
                 self.fft_scratch.as_mut_slice(),
             );
-            let mut peak_bins = find_top_20_bins(self.fft_output.as_slice());
+            let peak_bins = find_top_20_bins(self.fft_output.as_slice());
             let mut peaks: [Option<Peak>; 20] = [None; 20];
             let sample_rate = 48000.0;
             let window_size = 512;
@@ -318,7 +318,7 @@ mod test {
             48000.0,
         );
         let mut analyzer = PeakAnalyzer::new();
-        let peaks_a = analyzer.get_raw_peaks(&sample[0..512].try_into().unwrap());
+        let _peaks_a = analyzer.get_raw_peaks(&sample[0..512].try_into().unwrap());
     }
 
     #[test]
