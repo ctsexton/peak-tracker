@@ -39,7 +39,7 @@ fn find_bin_freq_quadratic(bins: &[Complex<f32>], bin: usize) -> f32 {
 }
 
 fn find_top_20_bins(bins: &[Complex<f32>]) -> [Option<(usize, f32)>; 20] {
-    let mut peak_bins: [Option<(usize, f32)>; 20] = [None; 20];
+    let mut peak_bins: [Option<(usize, f32)>; 256] = [None; 256];
     let mut peak_index = 0;
     let threshold = 1.0;
     let window_size = 512;
@@ -50,12 +50,24 @@ fn find_top_20_bins(bins: &[Complex<f32>]) -> [Option<(usize, f32)>; 20] {
         if magnitude > threshold && magnitude > previous_magnitude && magnitude > next_magnitude {
             peak_bins[peak_index] = Some((bin, magnitude));
             peak_index += 1;
-            if peak_index == 20 {
+            if peak_index == 256 {
                 break;
             }
         }
     }
-    return peak_bins;
+    peak_bins.sort_unstable_by(|a, b| {
+        if a.is_none() {
+            return std::cmp::Ordering::Less;
+        } else if b.is_none() {
+            return std::cmp::Ordering::Greater;
+        } else {
+            return a.unwrap().1.partial_cmp(&b.unwrap().1).unwrap();
+        }
+    });
+    peak_bins.reverse();
+    let mut top_20: [Option<(usize, f32)>; 20] = [None; 20];
+    top_20.clone_from_slice(&peak_bins[0..20]);
+    return top_20;
 }
 
 const NUM_PEAKS: usize = 20;
@@ -164,14 +176,6 @@ impl PeakAnalyzer {
             self.fft_scratch.as_mut_slice(),
         );
         let mut peak_bins = find_top_20_bins(self.fft_output.as_slice());
-        peak_bins.sort_unstable_by(|a, b| {
-            if a.is_none() || b.is_none() {
-                return std::cmp::Ordering::Less;
-            } else {
-                return a.unwrap().1.partial_cmp(&b.unwrap().1).unwrap();
-            }
-        });
-        peak_bins.reverse();
         let mut peaks: [Option<Peak>; 20] = [None; 20];
         let sample_rate = 48000.0;
         let window_size = 512;
@@ -210,9 +214,12 @@ impl PeakTracker {
                 new_peaks[index] = batch[target].take();
             }
         }
-        for index in 0..20 {
-            if new_peaks[index].is_none() && batch[index].is_some() {
-                new_peaks[index] = batch[index];
+        let mut unmapped_peaks = batch.iter_mut().flatten();
+        for new_peak in new_peaks.iter_mut().filter(|p| p.is_none()) {
+            if let Some(peak) = unmapped_peaks.next() {
+                *new_peak = Some(*peak);
+            } else {
+                break;
             }
         }
         self.peaks = new_peaks;
