@@ -230,7 +230,7 @@ impl PeakTracker {
         })
     }
 
-    fn latest(&self) -> &[Option<Peak>; 20] {
+    pub fn latest(&self) -> &[Option<Peak>; 20] {
         &self.peaks
     }
 }

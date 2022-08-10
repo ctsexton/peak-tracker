@@ -1,5 +1,6 @@
 use std::f32::consts::PI;
 
+#[derive(Debug)]
 pub struct SinOsc {
     frequency: f32, // radians per sample
     amplitude: f32,
