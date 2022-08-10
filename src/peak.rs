@@ -44,7 +44,8 @@ fn find_top_20_bins(bins: &[Complex<f32>]) -> [Option<(usize, f32)>; 20] {
     let mut peak_index = 0;
     let threshold = 1.0;
     let window_size = 512;
-    for bin in 1..window_size - 1 {
+    let minimum_bin = 4;
+    for bin in minimum_bin..window_size - 1 {
         let previous_magnitude = bins[bin - 1].norm();
         let magnitude = bins[bin].norm();
         let next_magnitude = bins[bin + 1].norm();
@@ -351,5 +352,15 @@ mod test {
         peaks_c.reverse();
         peak_tracker.update_peaks(peaks_c);
         println!("PEAKS C: {:?}", peak_tracker.latest());
+
+        let sample_d = build_sample(
+            &[(430.0, 0.0, 0.0), (1150.0, 0.0, 0.0), (180.0, 0.0, 0.0)],
+            512,
+            48000.0,
+        );
+        let mut peaks_d = analyzer.get_raw_peaks(&sample_d[0..512].try_into().unwrap());
+        peaks_d.reverse();
+        peak_tracker.update_peaks(peaks_d);
+        println!("PEAKS D: {:?}", peak_tracker.latest());
     }
 }

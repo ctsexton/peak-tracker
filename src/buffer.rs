@@ -11,7 +11,7 @@ impl Ringbuffer {
 
     pub fn write(&mut self, value: f32) {
         self.data[self.index] = value;
-        self.index += 1 % self.data.len();
+        self.index = (self.index + 1) % self.data.len();
     }
 
     pub fn get_reader(&self) -> BufferReader {
@@ -52,11 +52,14 @@ mod test {
         let mut buffer = Ringbuffer::new(4);
         buffer.write(1.0);
         buffer.write(2.0);
+        buffer.write(3.0);
+        buffer.write(4.0);
+        buffer.write(5.0);
         let mut reader = buffer.get_reader();
-        assert!((reader.next().unwrap() - 0.0).abs() < f32::EPSILON);
-        assert!((reader.next().unwrap() - 0.0).abs() < f32::EPSILON);
-        assert!((reader.next().unwrap() - 1.0).abs() < f32::EPSILON);
         assert!((reader.next().unwrap() - 2.0).abs() < f32::EPSILON);
+        assert!((reader.next().unwrap() - 3.0).abs() < f32::EPSILON);
+        assert!((reader.next().unwrap() - 4.0).abs() < f32::EPSILON);
+        assert!((reader.next().unwrap() - 5.0).abs() < f32::EPSILON);
         assert!(reader.next().is_none());
     }
 }

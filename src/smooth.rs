@@ -30,6 +30,10 @@ impl SmoothedValue {
         self.remaining_steps_to_target -= 1;
         return self.value;
     }
+
+    pub fn peek(&self) -> f32 {
+        self.value
+    }
 }
 
 #[cfg(test)]
