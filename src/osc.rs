@@ -30,8 +30,12 @@ impl SinOsc {
 
     pub fn next(&mut self) -> f32 {
         let phase = self.phase;
-        self.phase += self.frequency;
+        self.phase = (self.phase + self.frequency) % (2.0 * PI);
         f32::sin(phase) * self.amplitude
+    }
+
+    pub fn current_value(&self) -> f32 {
+        f32::sin(self.phase) * self.amplitude
     }
 }
 
