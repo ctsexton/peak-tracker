@@ -20,10 +20,10 @@ impl Plugin for ReconstructorPlugin {
     type InitFeatures = ();
     type AudioFeatures = ();
 
-    fn new(_plugin_info: &PluginInfo, _features: &mut ()) -> Option<Self> {
-        let reconstructor = Reconstructor::new();
-        let input = vec![0_f32; 512];
-        let output = vec![0_f32; 512];
+    fn new(plugin_info: &PluginInfo, _features: &mut ()) -> Option<Self> {
+        let reconstructor = Reconstructor::new(plugin_info.sample_rate() as f32);
+        let input = vec![0_f32; 2048];
+        let output = vec![0_f32; 2048];
         Some(Self {
             reconstructor,
             input,
@@ -32,6 +32,9 @@ impl Plugin for ReconstructorPlugin {
     }
 
     fn run(&mut self, ports: &mut Ports, _features: &mut (), _: u32) {
+        for in_copy in self.input.iter_mut() {
+            *in_copy = 0.0;
+        }
         for (in_frame, in_copy) in ports.input.iter().zip(self.input.iter_mut()) {
             *in_copy = *in_frame;
         }
@@ -41,8 +44,9 @@ impl Plugin for ReconstructorPlugin {
         for out_frame in ports.output.iter_mut() {
             *out_frame = 0.0;
         }
+        let block_size = ports.input.len();
         self.reconstructor
-            .run(self.input.as_slice(), self.output.as_mut_slice());
+            .run(&self.input[0..block_size], &mut self.output[0..block_size]);
         for (out_frame, out_copy) in ports.output.iter_mut().zip(self.output.iter()) {
             *out_frame = *out_copy;
         }

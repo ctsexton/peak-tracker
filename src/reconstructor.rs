@@ -9,10 +9,11 @@ pub struct Reconstructor {
     peak_analyzer: PeakAnalyzer,
     peak_tracker: PeakTracker,
     buffer: Ringbuffer,
+    sample_rate: f32,
 }
 
 impl Reconstructor {
-    pub fn new() -> Self {
+    pub fn new(sample_rate: f32) -> Self {
         let oscillators = (0..20)
             .map(|_| {
                 (
@@ -24,7 +25,7 @@ impl Reconstructor {
             .collect::<Vec<(SinOsc, SmoothedValue, SmoothedValue)>>()
             .try_into()
             .unwrap();
-        let peak_analyzer = PeakAnalyzer::new();
+        let peak_analyzer = PeakAnalyzer::new(sample_rate);
         let peak_tracker = PeakTracker::new();
         let buffer = Ringbuffer::new(512);
         Self {
@@ -32,6 +33,7 @@ impl Reconstructor {
             peak_analyzer,
             peak_tracker,
             buffer,
+            sample_rate,
         }
     }
 
@@ -49,7 +51,6 @@ impl Reconstructor {
         self.peak_tracker.update_peaks(raw_peaks);
         let peaks = self.peak_tracker.latest();
 
-        let sample_rate = 48000.0;
         for (peak, (osc, freq_smoother, amp_smoother)) in
             peaks.iter().zip(self.oscillators.iter_mut())
         {
@@ -57,7 +58,7 @@ impl Reconstructor {
                 freq_smoother.set_target(peak.frequency);
                 amp_smoother.set_target(peak.amplitude);
                 for sample in output.iter_mut() {
-                    osc.set_frequency_hz(freq_smoother.next(), sample_rate);
+                    osc.set_frequency_hz(freq_smoother.next(), self.sample_rate);
                     osc.set_amplitude(amp_smoother.next());
                     *sample = (*sample + osc.next()).clamp(-1.0, 1.0);
                 }
@@ -84,7 +85,7 @@ mod test {
             512,
             48000.0,
         );
-        let mut analyzer = PeakAnalyzer::new();
+        let mut analyzer = PeakAnalyzer::new(48000.0);
         let peaks_a = analyzer.get_raw_peaks(&sample_a[0..512].try_into().unwrap());
         let mut peak_tracker = PeakTracker::new();
         peak_tracker.update_peaks(peaks_a);

@@ -1,6 +1,5 @@
 use dasp::frame::Mono;
-use dasp::signal::window::{hanning};
-
+use dasp::signal::window::hanning;
 
 pub fn apply_hanning_window<const SIZE: usize>(frame: &[f32; SIZE]) -> [f32; SIZE] {
     let window = hanning::<Mono<f32>>(SIZE);

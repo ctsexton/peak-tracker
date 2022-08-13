@@ -18,14 +18,21 @@ fn find_bin_freq_quadratic(bins: &[Complex<f32>], bin: usize) -> f32 {
 fn find_top_20_bins(bins: &[Complex<f32>]) -> [Option<(usize, f32)>; MAX_PEAKS] {
     let mut peak_bins: [Option<(usize, f32)>; 256] = [None; 256];
     let mut peak_index = 0;
-    let threshold = 1.0;
+    let threshold = 0.6;
     let window_size = 512;
-    let minimum_bin = 4;
+    let minimum_bin = 2;
     for bin in minimum_bin..window_size - 1 {
         let previous_magnitude = bins[bin - 1].norm();
+        let previous2_magnitude = bins[bin - 2].norm();
         let magnitude = bins[bin].norm();
         let next_magnitude = bins[bin + 1].norm();
-        if magnitude > threshold && magnitude > previous_magnitude && magnitude > next_magnitude {
+        let next2_magnitude = bins[bin + 2].norm();
+        if magnitude > threshold
+            && magnitude > previous_magnitude
+            && magnitude > next_magnitude
+            && magnitude > previous2_magnitude
+            && magnitude > next2_magnitude
+        {
             peak_bins[peak_index] = Some((bin, magnitude));
             peak_index += 1;
             if peak_index == 256 {
@@ -53,10 +60,11 @@ pub struct PeakAnalyzer {
     fft_input: Vec<f32>,
     fft_scratch: Vec<Complex<f32>>,
     fft_output: Vec<Complex<f32>>,
+    sample_rate: f32,
 }
 
 impl PeakAnalyzer {
-    pub fn new() -> Self {
+    pub fn new(sample_rate: f32) -> Self {
         let mut planner = RealFftPlanner::<f32>::new();
         let plan = planner.plan_fft_forward(1024);
         let fft_input = plan.make_input_vec();
@@ -67,6 +75,7 @@ impl PeakAnalyzer {
             fft_input,
             fft_scratch,
             fft_output,
+            sample_rate,
         }
     }
 
@@ -87,9 +96,8 @@ impl PeakAnalyzer {
             );
             let peak_bins = find_top_20_bins(self.fft_output.as_slice());
             let mut peaks: [Option<Peak>; MAX_PEAKS] = [None; MAX_PEAKS];
-            let sample_rate = 48000.0;
             let window_size = 512;
-            let freq_per_bin = 0.5 * sample_rate / window_size as f32;
+            let freq_per_bin = 0.5 * self.sample_rate / window_size as f32;
 
             for (peak, peak_bin_pair) in peaks.iter_mut().zip(peak_bins.iter()) {
                 if let Some((peak_bin, magnitude)) = peak_bin_pair {
@@ -119,7 +127,7 @@ mod test {
             512,
             48000.0,
         );
-        let mut analyzer = PeakAnalyzer::new();
+        let mut analyzer = PeakAnalyzer::new(48000.0);
         let peaks_a = analyzer.get_raw_peaks(&sample[0..512].try_into().unwrap());
         let expected = [
             Some(Peak {
