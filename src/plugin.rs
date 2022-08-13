@@ -20,7 +20,7 @@ impl Plugin for ReconstructorPlugin {
     type InitFeatures = ();
     type AudioFeatures = ();
 
-    fn new(plugin_info: &PluginInfo, _features: &mut ()) -> Option<Self> {
+    fn new(_plugin_info: &PluginInfo, _features: &mut ()) -> Option<Self> {
         let reconstructor = Reconstructor::new();
         let input = vec![0_f32; 512];
         let output = vec![0_f32; 512];

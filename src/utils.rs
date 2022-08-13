@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 /// Returns the size of each bin when dividing the frequency range from
 /// 0 to the nyquist frequency by num_bins;
 /// ```
@@ -37,6 +39,18 @@ pub fn floor_to_power_of_2(n: usize) -> Option<usize> {
     Some(1 << ilog2(n)?)
 }
 
+pub fn build_sample(partials: &[(f32, f32, f32)], size: usize, sample_rate: f32) -> Vec<f32> {
+    let mut sample = vec![0_f32; size];
+    for (frequency, amplitude, phase) in partials {
+        for (index, x) in sample.iter_mut().enumerate() {
+            *x = *x
+                + amplitude
+                    * (phase * 2. * PI + index as f32 * 2. * PI * frequency / sample_rate).sin()
+        }
+    }
+    sample
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -64,5 +78,16 @@ mod test {
         assert_eq!(floor_to_power_of_2(3), Some(2));
         assert_eq!(floor_to_power_of_2(1023), Some(512));
         assert_eq!(floor_to_power_of_2(1025), Some(1024));
+    }
+
+    #[test]
+    fn test_build_sample() {
+        let partials = [(2.0, 1.0, 0.0)];
+        let sample = build_sample(&partials, 8, 8.0);
+        let expected_sample = [0.0, 1.0, 0.0, -1.0];
+        for (item, expected) in sample.iter().zip(expected_sample.iter()) {
+            let diff = (*item - *expected).abs();
+            assert!(diff < 0.001);
+        }
     }
 }
