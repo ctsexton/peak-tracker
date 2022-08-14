@@ -5,6 +5,8 @@ use lv2::prelude::*;
 struct Ports {
     input: InputPort<Audio>,
     output: OutputPort<Audio>,
+    freeze: InputPort<Control>,
+    transpose: InputPort<Control>,
 }
 
 #[uri("https://github.com/ctsexton/reconstructor-lv2")]
@@ -45,6 +47,9 @@ impl Plugin for ReconstructorPlugin {
             *out_frame = 0.0;
         }
         let block_size = ports.input.len();
+        let freeze_active = *ports.freeze > 0.0;
+        self.reconstructor.set_freeze(freeze_active);
+        self.reconstructor.set_transpose(*ports.transpose);
         self.reconstructor
             .run(&self.input[0..block_size], &mut self.output[0..block_size]);
         for (out_frame, out_copy) in ports.output.iter_mut().zip(self.output.iter()) {

@@ -18,7 +18,7 @@ fn find_bin_freq_quadratic(bins: &[Complex<f32>], bin: usize) -> f32 {
 fn find_top_20_bins(bins: &[Complex<f32>]) -> [Option<(usize, f32)>; MAX_PEAKS] {
     let mut peak_bins: [Option<(usize, f32)>; 256] = [None; 256];
     let mut peak_index = 0;
-    let threshold = 0.6;
+    let threshold = 0.06;
     let window_size = 512;
     let minimum_bin = 2;
     for bin in minimum_bin..window_size - 1 {

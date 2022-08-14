@@ -17,8 +17,10 @@ impl SmoothedValue {
     }
 
     pub fn set_target(&mut self, target: f32) {
-        self.target = target;
-        self.remaining_steps_to_target = self.smooth_length;
+        if (self.target - target).abs() > f32::EPSILON {
+            self.target = target;
+            self.remaining_steps_to_target = self.smooth_length;
+        }
     }
 
     pub fn next(&mut self) -> f32 {
