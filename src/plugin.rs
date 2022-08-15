@@ -7,6 +7,7 @@ struct Ports {
     output: OutputPort<Audio>,
     freeze: InputPort<Control>,
     transpose: InputPort<Control>,
+    detune: InputPort<Control>,
 }
 
 #[uri("https://github.com/ctsexton/reconstructor-lv2")]
@@ -50,6 +51,7 @@ impl Plugin for ReconstructorPlugin {
         let freeze_active = *ports.freeze > 0.0;
         self.reconstructor.set_freeze(freeze_active);
         self.reconstructor.set_transpose(*ports.transpose);
+        self.reconstructor.set_detune(*ports.detune);
         self.reconstructor
             .run(&self.input[0..block_size], &mut self.output[0..block_size]);
         for (out_frame, out_copy) in ports.output.iter_mut().zip(self.output.iter()) {

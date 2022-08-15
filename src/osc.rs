@@ -9,7 +9,11 @@ pub struct SinOsc {
 }
 
 fn get_lowpass_amp(hz: f32) -> f32 {
-    if hz > 18000.0 { (-0.00025 * hz + 5.5).clamp(0.0, 1.0) } else { 1.0 }
+    if hz > 18000.0 {
+        (-0.00025 * hz + 5.5).clamp(0.0, 1.0)
+    } else {
+        1.0
+    }
 }
 
 impl SinOsc {
@@ -23,6 +27,7 @@ impl SinOsc {
     }
 
     pub fn set_frequency_hz(&mut self, hz: f32, sample_rate: f32) {
+        let hz = hz.clamp(20.0, sample_rate * 0.5);
         self.frequency = 2.0 * PI * hz / sample_rate;
         self.lowpass_amp = get_lowpass_amp(hz);
     }

@@ -3,19 +3,29 @@ use crate::buffer::Ringbuffer;
 use crate::osc::SinOsc;
 use crate::smooth::SmoothedValue;
 use crate::tracker::PeakTracker;
+use dasp::signal::noise;
 
 pub struct Reconstructor {
-    oscillators: [(SinOsc, SmoothedValue, SmoothedValue, SmoothedValue); 20],
+    oscillators: [(
+        SinOsc,
+        SmoothedValue,
+        SmoothedValue,
+        SmoothedValue,
+        SmoothedValue,
+        SmoothedValue,
+    ); 20],
     peak_analyzer: PeakAnalyzer,
     peak_tracker: PeakTracker,
     buffer: Ringbuffer,
     sample_rate: f32,
     freeze: bool,
     transpose: f32,
+    detune: f32,
 }
 
 impl Reconstructor {
     pub fn new(sample_rate: f32) -> Self {
+        let mut noise = noise(0);
         let oscillators = (0..20)
             .map(|_| {
                 (
@@ -23,9 +33,18 @@ impl Reconstructor {
                     SmoothedValue::new(440.0, 64),
                     SmoothedValue::new(0.0, 64),
                     SmoothedValue::new(1.0, 64),
+                    SmoothedValue::new(noise.next_sample() as f32, 64),
+                    SmoothedValue::new(0.0, 64),
                 )
             })
-            .collect::<Vec<(SinOsc, SmoothedValue, SmoothedValue, SmoothedValue)>>()
+            .collect::<Vec<(
+                SinOsc,
+                SmoothedValue,
+                SmoothedValue,
+                SmoothedValue,
+                SmoothedValue,
+                SmoothedValue,
+            )>>()
             .try_into()
             .unwrap();
         let peak_analyzer = PeakAnalyzer::new(sample_rate);
@@ -33,6 +52,7 @@ impl Reconstructor {
         let buffer = Ringbuffer::new(512);
         let freeze = false;
         let transpose = 1.0;
+        let detune = 0.0;
         Self {
             oscillators,
             peak_analyzer,
@@ -41,6 +61,7 @@ impl Reconstructor {
             sample_rate,
             freeze,
             transpose,
+            detune,
         }
     }
 
@@ -51,6 +72,10 @@ impl Reconstructor {
     pub fn set_transpose(&mut self, amount: f32) {
         let value = 2_f32.powf(amount.clamp(-2.0, 2.0));
         self.transpose = value;
+    }
+
+    pub fn set_detune(&mut self, amount: f32) {
+        self.detune = amount.clamp(0.0, 1.0);
     }
 
     pub fn run(&mut self, input: &[f32], output: &mut [f32]) {
@@ -67,17 +92,26 @@ impl Reconstructor {
         self.peak_tracker.update_peaks(raw_peaks);
         let peaks = self.peak_tracker.latest();
 
-        for (peak, (osc, freq_smoother, amp_smoother, transpose_smoother)) in
-            peaks.iter().zip(self.oscillators.iter_mut())
+        for (
+            peak,
+            (osc, freq_smoother, amp_smoother, transpose_smoother, rand_smoother, detune_smoother),
+        ) in peaks.iter().zip(self.oscillators.iter_mut())
         {
             transpose_smoother.set_target(self.transpose);
+            detune_smoother.set_target(self.detune);
             if let Some(peak) = peak {
                 if !self.freeze {
                     freq_smoother.set_target(peak.frequency);
                     amp_smoother.set_target(peak.amplitude);
                 }
                 for sample in output.iter_mut() {
-                    osc.set_frequency_hz(freq_smoother.next() * transpose_smoother.next(), self.sample_rate);
+                    let rand_amount = 2_f32
+                        .powf(rand_smoother.next() * 2.0 * detune_smoother.next())
+                        .clamp(0.25, 4.0);
+                    osc.set_frequency_hz(
+                        freq_smoother.next() * transpose_smoother.next() * rand_amount,
+                        self.sample_rate,
+                    );
                     osc.set_amplitude(amp_smoother.next());
                     *sample = (*sample + osc.next()).clamp(-1.0, 1.0);
                 }
@@ -86,7 +120,13 @@ impl Reconstructor {
                     amp_smoother.set_target(0.0);
                 }
                 for sample in output.iter_mut() {
-                    osc.set_frequency_hz(freq_smoother.next() * transpose_smoother.next(), self.sample_rate);
+                    let rand_amount = 2_f32
+                        .powf(rand_smoother.next() * 2.0 * detune_smoother.next())
+                        .clamp(0.25, 4.0);
+                    osc.set_frequency_hz(
+                        freq_smoother.next() * transpose_smoother.next() * rand_amount,
+                        self.sample_rate,
+                    );
                     osc.set_amplitude(amp_smoother.next());
                     *sample = (*sample + osc.next()).clamp(-1.0, 1.0);
                 }
