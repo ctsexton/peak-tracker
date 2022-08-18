@@ -1,9 +1,85 @@
 use crate::analyzers::quadratic::PeakAnalyzer;
 use crate::buffer::Ringbuffer;
 use crate::osc::SinOsc;
+use crate::peak::Peak;
 use crate::smooth::SmoothedValue;
 use crate::tracker::PeakTracker;
+use crate::voice::{Note, Voice};
 use dasp::signal::noise;
+
+struct Smoothers {
+    freq: SmoothedValue,
+    amp: SmoothedValue,
+    transpose: SmoothedValue,
+    random: SmoothedValue,
+    detune: SmoothedValue,
+}
+
+struct Oscillator {
+    osc: SinOsc,
+    smoothers: Smoothers,
+}
+
+struct ReconstructorVoice {
+    sample_rate: f32,
+    note: Option<Note>,
+    oscillators: [Oscillator; 20],
+}
+
+const MIDDLE_C: u8 = 60; // Midi note num for center
+
+impl Voice for ReconstructorVoice {
+    fn get_note(&self) -> &Option<Note> {
+        &self.note
+    }
+
+    fn set_note(&mut self, note: Option<Note>) {
+        self.note = note;
+    }
+
+    fn render_block(&mut self, block: &mut [f32]) {
+        // TODO: Render the note envelope
+        if let Some(note) = &self.note {
+            let note_offset = MIDDLE_C - note.note_number;
+        }
+        for Oscillator { osc, smoothers } in self.oscillators.iter_mut() {
+            for sample in block.iter_mut() {
+                let rand_amount = 2_f32
+                    .powf(smoothers.random.next() * 2.0 * smoothers.detune.next())
+                    .clamp(0.25, 4.0);
+                osc.set_frequency_hz(
+                    smoothers.freq.next() * smoothers.transpose.next() * rand_amount,
+                    self.sample_rate,
+                );
+                osc.set_amplitude(smoothers.amp.next());
+                *sample = (*sample + osc.next()).clamp(-1.0, 1.0);
+            }
+        }
+    }
+}
+
+impl ReconstructorVoice {
+    fn prepare_oscillators(
+        &mut self,
+        peaks: &[Option<Peak>],
+        freeze: bool,
+        transpose: f32,
+        detune: f32,
+    ) {
+        for (peak, Oscillator { osc, smoothers }) in peaks.iter().zip(self.oscillators.iter_mut()) {
+            smoothers.transpose.set_target(transpose);
+            smoothers.detune.set_target(detune);
+            if !freeze {
+                if let Some(peak) = peak {
+                    smoothers.freq.set_target(peak.frequency);
+                    smoothers.amp.set_target(peak.amplitude);
+                } else {
+                    smoothers.amp.set_target(0.0);
+                }
+            }
+        }
+    }
+}
 
 pub struct Reconstructor {
     oscillators: [(
