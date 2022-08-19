@@ -7,6 +7,7 @@ use crate::tracker::PeakTracker;
 use crate::voice::{Note, Voice};
 use dasp::signal::noise;
 
+#[derive(Debug)]
 struct Smoothers {
     freq: SmoothedValue,
     amp: SmoothedValue,
@@ -15,6 +16,7 @@ struct Smoothers {
     detune: SmoothedValue,
 }
 
+#[derive(Debug)]
 struct Oscillator {
     osc: SinOsc,
     smoothers: Smoothers,
@@ -39,19 +41,26 @@ impl Voice for ReconstructorVoice {
 
     fn render_block(&mut self, block: &mut [f32]) {
         // TODO: Render the note envelope
-        if let Some(note) = &self.note {
-            let note_offset = MIDDLE_C - note.note_number;
-        }
+        let (note_offset, note_amp) = {
+            if let Some(note) = &self.note {
+                let note_offset = note.note_number as i32 - MIDDLE_C as i32;
+                (note_offset as f32, 1.0)
+            } else {
+                (0.0, 0.0)
+            }
+        };
+        let freq_multiplier = 2_f32.powf(note_offset / 12.0);
+
         for Oscillator { osc, smoothers } in self.oscillators.iter_mut() {
             for sample in block.iter_mut() {
                 let rand_amount = 2_f32
                     .powf(smoothers.random.next() * 2.0 * smoothers.detune.next())
                     .clamp(0.25, 4.0);
                 osc.set_frequency_hz(
-                    smoothers.freq.next() * smoothers.transpose.next() * rand_amount,
+                    smoothers.freq.next() * smoothers.transpose.next() * rand_amount * freq_multiplier,
                     self.sample_rate,
                 );
-                osc.set_amplitude(smoothers.amp.next());
+                osc.set_amplitude(smoothers.amp.next() * note_amp);
                 *sample = (*sample + osc.next()).clamp(-1.0, 1.0);
             }
         }
@@ -59,6 +68,27 @@ impl Voice for ReconstructorVoice {
 }
 
 impl ReconstructorVoice {
+    fn new(sample_rate: f32) -> Self {
+        let mut noise = noise(rand::random::<u64>());
+        let oscillators = (0..20)
+            .map(|_| {
+                Oscillator {
+                    osc: SinOsc::new(440.0, 0.0, 0.0),
+                    smoothers: Smoothers {
+                        freq: SmoothedValue::new(440.0, 64),
+                        amp: SmoothedValue::new(0.0, 64),
+                        transpose: SmoothedValue::new(1.0, 64),
+                        random: SmoothedValue::new(noise.next_sample() as f32, 64),
+                        detune: SmoothedValue::new(0.0, 64),
+                    }
+                }
+            })
+            .collect::<Vec<Oscillator>>()
+            .try_into()
+            .unwrap();
+        Self{ sample_rate, note: None, oscillators }
+    }
+
     fn prepare_oscillators(
         &mut self,
         peaks: &[Option<Peak>],
@@ -82,14 +112,6 @@ impl ReconstructorVoice {
 }
 
 pub struct Reconstructor {
-    oscillators: [(
-        SinOsc,
-        SmoothedValue,
-        SmoothedValue,
-        SmoothedValue,
-        SmoothedValue,
-        SmoothedValue,
-    ); 20],
     peak_analyzer: PeakAnalyzer,
     peak_tracker: PeakTracker,
     buffer: Ringbuffer,
@@ -97,40 +119,24 @@ pub struct Reconstructor {
     freeze: bool,
     transpose: f32,
     detune: f32,
+    voices: Vec<ReconstructorVoice>,
 }
 
 impl Reconstructor {
     pub fn new(sample_rate: f32) -> Self {
-        let mut noise = noise(0);
-        let oscillators = (0..20)
-            .map(|_| {
-                (
-                    SinOsc::new(440.0, 0.0, 0.0),
-                    SmoothedValue::new(440.0, 64),
-                    SmoothedValue::new(0.0, 64),
-                    SmoothedValue::new(1.0, 64),
-                    SmoothedValue::new(noise.next_sample() as f32, 64),
-                    SmoothedValue::new(0.0, 64),
-                )
-            })
-            .collect::<Vec<(
-                SinOsc,
-                SmoothedValue,
-                SmoothedValue,
-                SmoothedValue,
-                SmoothedValue,
-                SmoothedValue,
-            )>>()
-            .try_into()
-            .unwrap();
         let peak_analyzer = PeakAnalyzer::new(sample_rate);
         let peak_tracker = PeakTracker::new();
         let buffer = Ringbuffer::new(512);
         let freeze = false;
         let transpose = 1.0;
         let detune = 0.0;
+        let voices = [0, 7, 10, 15, -12].iter().map(|i| {
+            let mut voice = ReconstructorVoice::new(sample_rate);
+            let note_number = MIDDLE_C as i32 + i;
+            voice.set_note(Some(Note{ note_number: note_number as u8 }));
+            voice
+        }).collect::<Vec<ReconstructorVoice>>();
         Self {
-            oscillators,
             peak_analyzer,
             peak_tracker,
             buffer,
@@ -138,6 +144,7 @@ impl Reconstructor {
             freeze,
             transpose,
             detune,
+            voices,
         }
     }
 
@@ -168,45 +175,11 @@ impl Reconstructor {
         self.peak_tracker.update_peaks(raw_peaks);
         let peaks = self.peak_tracker.latest();
 
-        for (
-            peak,
-            (osc, freq_smoother, amp_smoother, transpose_smoother, rand_smoother, detune_smoother),
-        ) in peaks.iter().zip(self.oscillators.iter_mut())
-        {
-            transpose_smoother.set_target(self.transpose);
-            detune_smoother.set_target(self.detune);
-            if let Some(peak) = peak {
-                if !self.freeze {
-                    freq_smoother.set_target(peak.frequency);
-                    amp_smoother.set_target(peak.amplitude);
-                }
-                for sample in output.iter_mut() {
-                    let rand_amount = 2_f32
-                        .powf(rand_smoother.next() * 2.0 * detune_smoother.next())
-                        .clamp(0.25, 4.0);
-                    osc.set_frequency_hz(
-                        freq_smoother.next() * transpose_smoother.next() * rand_amount,
-                        self.sample_rate,
-                    );
-                    osc.set_amplitude(amp_smoother.next());
-                    *sample = (*sample + osc.next()).clamp(-1.0, 1.0);
-                }
-            } else {
-                if !self.freeze {
-                    amp_smoother.set_target(0.0);
-                }
-                for sample in output.iter_mut() {
-                    let rand_amount = 2_f32
-                        .powf(rand_smoother.next() * 2.0 * detune_smoother.next())
-                        .clamp(0.25, 4.0);
-                    osc.set_frequency_hz(
-                        freq_smoother.next() * transpose_smoother.next() * rand_amount,
-                        self.sample_rate,
-                    );
-                    osc.set_amplitude(amp_smoother.next());
-                    *sample = (*sample + osc.next()).clamp(-1.0, 1.0);
-                }
-            }
+        for voice in self.voices.iter_mut() {
+            voice.prepare_oscillators(peaks, self.freeze, self.transpose, self.detune);
+        }
+        for voice in self.voices.iter_mut() {
+            voice.render_block(output);
         }
     }
 }
