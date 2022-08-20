@@ -352,6 +352,7 @@ dependencies = [
  "lv2",
  "rand",
  "realfft",
+ "wmidi",
 ]
 
 [[package]]

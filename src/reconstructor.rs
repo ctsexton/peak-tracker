@@ -57,7 +57,10 @@ impl Voice for ReconstructorVoice {
                     .powf(smoothers.random.next() * 2.0 * smoothers.detune.next())
                     .clamp(0.25, 4.0);
                 osc.set_frequency_hz(
-                    smoothers.freq.next() * smoothers.transpose.next() * rand_amount * freq_multiplier,
+                    smoothers.freq.next()
+                        * smoothers.transpose.next()
+                        * rand_amount
+                        * freq_multiplier,
                     self.sample_rate,
                 );
                 osc.set_amplitude(smoothers.amp.next() * note_amp);
@@ -71,22 +74,24 @@ impl ReconstructorVoice {
     fn new(sample_rate: f32) -> Self {
         let mut noise = noise(rand::random::<u64>());
         let oscillators = (0..20)
-            .map(|_| {
-                Oscillator {
-                    osc: SinOsc::new(440.0, 0.0, 0.0),
-                    smoothers: Smoothers {
-                        freq: SmoothedValue::new(440.0, 64),
-                        amp: SmoothedValue::new(0.0, 64),
-                        transpose: SmoothedValue::new(1.0, 64),
-                        random: SmoothedValue::new(noise.next_sample() as f32, 64),
-                        detune: SmoothedValue::new(0.0, 64),
-                    }
-                }
+            .map(|_| Oscillator {
+                osc: SinOsc::new(440.0, 0.0, 0.0),
+                smoothers: Smoothers {
+                    freq: SmoothedValue::new(440.0, 64),
+                    amp: SmoothedValue::new(0.0, 64),
+                    transpose: SmoothedValue::new(1.0, 64),
+                    random: SmoothedValue::new(noise.next_sample() as f32, 64),
+                    detune: SmoothedValue::new(0.0, 64),
+                },
             })
             .collect::<Vec<Oscillator>>()
             .try_into()
             .unwrap();
-        Self{ sample_rate, note: None, oscillators }
+        Self {
+            sample_rate,
+            note: None,
+            oscillators,
+        }
     }
 
     fn prepare_oscillators(
@@ -120,6 +125,10 @@ pub struct Reconstructor {
     transpose: f32,
     detune: f32,
     voices: Vec<ReconstructorVoice>,
+    // default is used for non-synth mode
+    // where there is a single always-on voice
+    default_voice: ReconstructorVoice,
+    synth_mode: bool,
 }
 
 impl Reconstructor {
@@ -130,12 +139,21 @@ impl Reconstructor {
         let freeze = false;
         let transpose = 1.0;
         let detune = 0.0;
-        let voices = [0, 7, 10, 15, -12].iter().map(|i| {
-            let mut voice = ReconstructorVoice::new(sample_rate);
-            let note_number = MIDDLE_C as i32 + i;
-            voice.set_note(Some(Note{ note_number: note_number as u8 }));
-            voice
-        }).collect::<Vec<ReconstructorVoice>>();
+        let voices = [-21, -14, -7, 0, 7, 14, 21]
+            .iter()
+            .map(|i| {
+                let mut voice = ReconstructorVoice::new(sample_rate);
+                let note_number = MIDDLE_C as i32 + i;
+                voice.set_note(Some(Note {
+                    note_number: note_number as u8,
+                }));
+                voice
+            })
+            .collect::<Vec<ReconstructorVoice>>();
+        let mut default_voice = ReconstructorVoice::new(sample_rate);
+        default_voice.set_note(Some(Note {
+            note_number: MIDDLE_C,
+        }));
         Self {
             peak_analyzer,
             peak_tracker,
@@ -145,6 +163,8 @@ impl Reconstructor {
             transpose,
             detune,
             voices,
+            default_voice,
+            synth_mode: false,
         }
     }
 
@@ -161,6 +181,10 @@ impl Reconstructor {
         self.detune = amount.clamp(0.0, 1.0);
     }
 
+    pub fn set_synth_mode(&mut self, is_active: bool) {
+        self.synth_mode = is_active;
+    }
+
     pub fn run(&mut self, input: &[f32], output: &mut [f32]) {
         assert!(input.len() <= 512 && output.len() == input.len());
         for sample in input.iter() {
@@ -175,11 +199,17 @@ impl Reconstructor {
         self.peak_tracker.update_peaks(raw_peaks);
         let peaks = self.peak_tracker.latest();
 
-        for voice in self.voices.iter_mut() {
-            voice.prepare_oscillators(peaks, self.freeze, self.transpose, self.detune);
-        }
-        for voice in self.voices.iter_mut() {
-            voice.render_block(output);
+        if self.synth_mode {
+            for voice in self.voices.iter_mut() {
+                voice.prepare_oscillators(peaks, self.freeze, self.transpose, self.detune);
+            }
+            for voice in self.voices.iter_mut() {
+                voice.render_block(output);
+            }
+        } else {
+            self.default_voice
+                .prepare_oscillators(peaks, self.freeze, self.transpose, self.detune);
+            self.default_voice.render_block(output);
         }
     }
 }
