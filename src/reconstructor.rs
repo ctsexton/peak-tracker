@@ -4,7 +4,7 @@ use crate::osc::SinOsc;
 use crate::peak::Peak;
 use crate::smooth::SmoothedValue;
 use crate::tracker::PeakTracker;
-use crate::voice::{Note, Voice};
+use crate::voice::{Event, Note, Synth, Voice};
 use dasp::signal::noise;
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ impl Voice for ReconstructorVoice {
         let (note_offset, note_amp) = {
             if let Some(note) = &self.note {
                 let note_offset = note.note_number as i32 - MIDDLE_C as i32;
-                (note_offset as f32, 1.0)
+                (note_offset as f32, 0.25)
             } else {
                 (0.0, 0.0)
             }
@@ -116,6 +116,20 @@ impl ReconstructorVoice {
     }
 }
 
+struct ReconstructorSynth {
+    voices: Vec<ReconstructorVoice>,
+}
+
+impl Synth<ReconstructorVoice> for ReconstructorSynth {
+    fn get_voices(&self) -> &[ReconstructorVoice] {
+        self.voices.as_slice()
+    }
+
+    fn get_voices_mut(&mut self) -> &mut [ReconstructorVoice] {
+        self.voices.as_mut_slice()
+    }
+}
+
 pub struct Reconstructor {
     peak_analyzer: PeakAnalyzer,
     peak_tracker: PeakTracker,
@@ -124,11 +138,11 @@ pub struct Reconstructor {
     freeze: bool,
     transpose: f32,
     detune: f32,
-    voices: Vec<ReconstructorVoice>,
     // default is used for non-synth mode
     // where there is a single always-on voice
     default_voice: ReconstructorVoice,
     synth_mode: bool,
+    synth: ReconstructorSynth,
 }
 
 impl Reconstructor {
@@ -139,17 +153,10 @@ impl Reconstructor {
         let freeze = false;
         let transpose = 1.0;
         let detune = 0.0;
-        let voices = [-21, -14, -7, 0, 7, 14, 21]
-            .iter()
-            .map(|i| {
-                let mut voice = ReconstructorVoice::new(sample_rate);
-                let note_number = MIDDLE_C as i32 + i;
-                voice.set_note(Some(Note {
-                    note_number: note_number as u8,
-                }));
-                voice
-            })
+        let voices = (0..8)
+            .map(|_| ReconstructorVoice::new(sample_rate))
             .collect::<Vec<ReconstructorVoice>>();
+        let synth = ReconstructorSynth { voices };
         let mut default_voice = ReconstructorVoice::new(sample_rate);
         default_voice.set_note(Some(Note {
             note_number: MIDDLE_C,
@@ -162,9 +169,9 @@ impl Reconstructor {
             freeze,
             transpose,
             detune,
-            voices,
             default_voice,
             synth_mode: false,
+            synth,
         }
     }
 
@@ -185,7 +192,7 @@ impl Reconstructor {
         self.synth_mode = is_active;
     }
 
-    pub fn run(&mut self, input: &[f32], output: &mut [f32]) {
+    pub fn run(&mut self, input: &[f32], output: &mut [f32], events: &[Event]) {
         assert!(input.len() <= 512 && output.len() == input.len());
         for sample in input.iter() {
             self.buffer.write(*sample);
@@ -200,12 +207,10 @@ impl Reconstructor {
         let peaks = self.peak_tracker.latest();
 
         if self.synth_mode {
-            for voice in self.voices.iter_mut() {
+            for voice in self.synth.voices.iter_mut() {
                 voice.prepare_oscillators(peaks, self.freeze, self.transpose, self.detune);
             }
-            for voice in self.voices.iter_mut() {
-                voice.render_block(output);
-            }
+            self.synth.render_block(output, events);
         } else {
             self.default_voice
                 .prepare_oscillators(peaks, self.freeze, self.transpose, self.detune);

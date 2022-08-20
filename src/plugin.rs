@@ -1,4 +1,5 @@
 use crate::reconstructor::Reconstructor;
+use crate::voice::{Event, EventData};
 use lv2::prelude::*;
 use wmidi::*;
 
@@ -31,6 +32,7 @@ struct ReconstructorPlugin {
     input: Vec<f32>,
     output: Vec<f32>,
     urids: URIDs,
+    events: Vec<Event>,
 }
 
 impl Plugin for ReconstructorPlugin {
@@ -43,11 +45,13 @@ impl Plugin for ReconstructorPlugin {
         let reconstructor = Reconstructor::new(plugin_info.sample_rate() as f32);
         let input = vec![0_f32; 2048];
         let output = vec![0_f32; 2048];
+        let events = Vec::<Event>::with_capacity(256);
         Some(Self {
             reconstructor,
             input,
             output,
             urids: features.map.populate_collection()?,
+            events,
         })
     }
 
@@ -64,6 +68,7 @@ impl Plugin for ReconstructorPlugin {
         for out_frame in ports.output.iter_mut() {
             *out_frame = 0.0;
         }
+        self.events.clear();
 
         let midi_sequence = ports
             .events_in
@@ -71,6 +76,9 @@ impl Plugin for ReconstructorPlugin {
             .unwrap();
 
         for (timestamp, message) in midi_sequence {
+            if self.events.len() == self.events.capacity() {
+                break;
+            }
             let timestamp = timestamp.as_frames().unwrap();
 
             let message = if let Some(message) = message.read(self.urids.midi.wmidi, ()) {
@@ -80,11 +88,24 @@ impl Plugin for ReconstructorPlugin {
             };
 
             match message {
-                MidiMessage::NoteOn(_, _, _) => {
-                    println!("NOTE ON");
+                MidiMessage::NoteOn(_, note, _) => {
+                    let event = Event {
+                        offset: timestamp as f32,
+                        data: EventData::NoteOn {
+                            note_number: u8::from(note),
+                            velocity: 127,
+                        },
+                    };
+                    self.events.push(event);
                 }
-                MidiMessage::NoteOff(_, _, _) => {
-                    println!("NOTE OFF");
+                MidiMessage::NoteOff(_, note, _) => {
+                    let event = Event {
+                        offset: timestamp as f32,
+                        data: EventData::NoteOff {
+                            note_number: u8::from(note),
+                        },
+                    };
+                    self.events.push(event);
                 }
                 _ => (),
             }
@@ -96,8 +117,11 @@ impl Plugin for ReconstructorPlugin {
         self.reconstructor.set_transpose(*ports.transpose);
         self.reconstructor.set_detune(*ports.detune);
         self.reconstructor.set_synth_mode(*ports.synth_mode > 0.0);
-        self.reconstructor
-            .run(&self.input[0..block_size], &mut self.output[0..block_size]);
+        self.reconstructor.run(
+            &self.input[0..block_size],
+            &mut self.output[0..block_size],
+            self.events.as_slice(),
+        );
         for (out_frame, out_copy) in ports.output.iter_mut().zip(self.output.iter()) {
             *out_frame = *out_copy;
         }
