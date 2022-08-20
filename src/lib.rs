@@ -9,6 +9,7 @@ pub mod reconstructor;
 pub mod smooth;
 pub mod tracker;
 pub mod utils;
+pub mod voice;
 pub mod window;
 
 use assert_no_alloc::*;
