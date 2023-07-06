@@ -1,5 +1,5 @@
-use crate::reconstructor::Reconstructor;
-use crate::voice::{Event, EventData};
+use core::reconstructor::Reconstructor;
+use core::voice::{Event, EventData};
 use lv2::prelude::*;
 use wmidi::*;
 

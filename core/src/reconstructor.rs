@@ -193,7 +193,7 @@ impl Reconstructor {
     }
 
     pub fn run(&mut self, input: &[f32], output: &mut [f32], events: &[Event]) {
-        assert!(input.len() <= 512 && output.len() == input.len());
+        assert!(output.len() == input.len());
         for sample in input.iter() {
             self.buffer.write(*sample);
         }
