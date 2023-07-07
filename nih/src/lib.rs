@@ -3,15 +3,12 @@ use std::sync::Arc;
 use core::reconstructor::Reconstructor;
 use core::voice::{Event, EventData};
 
-// This is a shortened version of the gain example with most comments removed, check out
-// https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
-// started
-
 struct PeakTracker {
     params: Arc<PeakTrackerParams>,
     reconstructor: Option<Reconstructor>,
     input: Vec<f32>,
     output: Vec<f32>,
+    events: Vec<Event>,
 }
 
 #[derive(Params)]
@@ -35,8 +32,9 @@ impl Default for PeakTracker {
         Self {
             params: Arc::new(PeakTrackerParams::default()),
             reconstructor: None,
-            input: vec![0_f32; 2048],
-            output: vec![0_f32; 2048],
+            input: vec![0_f32; 4096],
+            output: vec![0_f32; 4096],
+            events: Vec::<Event>::with_capacity(256),
         }
     }
 }
@@ -96,7 +94,7 @@ impl Plugin for PeakTracker {
     }];
 
 
-    const MIDI_INPUT: MidiConfig = MidiConfig::None;
+    const MIDI_INPUT: MidiConfig = MidiConfig::Basic;
     const MIDI_OUTPUT: MidiConfig = MidiConfig::None;
 
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
@@ -120,9 +118,6 @@ impl Plugin for PeakTracker {
         buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
-        // Resize buffers and perform other potentially expensive initialization operations here.
-        // The `reset()` function is always called right after this function. You can remove this
-        // function if you do not need it.
         self.reconstructor = Some(Reconstructor::new(buffer_config.sample_rate));
         true
     }
@@ -136,7 +131,7 @@ impl Plugin for PeakTracker {
         &mut self,
         buffer: &mut Buffer,
         _aux: &mut AuxiliaryBuffers,
-        _context: &mut impl ProcessContext<Self>,
+        context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         for in_copy in self.input.iter_mut() {
             *in_copy = 0.0;
@@ -153,17 +148,47 @@ impl Plugin for PeakTracker {
                 *sample = 0_f32;
             }
         }
+        self.events.clear();
+
+        while let Some(event) = context.next_event() {
+            if self.events.len() == self.events.capacity() {
+                break;
+            }
+            let timestamp = event.timing();
+
+            match event {
+                NoteEvent::NoteOn{ note, .. } => {
+                    let event = Event {
+                        offset: timestamp as f32,
+                        data: EventData::NoteOn {
+                            note_number: note,
+                            velocity: 127,
+                        },
+                    };
+                    self.events.push(event);
+                }
+                NoteEvent::NoteOff{ note, .. } => {
+                    let event = Event {
+                        offset: timestamp as f32,
+                        data: EventData::NoteOff {
+                            note_number: note,
+                        },
+                    };
+                    self.events.push(event);
+                }
+                _ => (),
+            }
+        }
 
         let mut reconstructor = self.reconstructor.take().unwrap();
         reconstructor.set_freeze(self.params.freeze.value());
         reconstructor.set_transpose(self.params.transpose.value());
         reconstructor.set_detune(self.params.detune.value());
         reconstructor.set_synth_mode(self.params.synth_mode.value());
-        let events = [];
         reconstructor.run(
             &self.input[0..buffer.samples()],
             &mut self.output[0..buffer.samples()],
-            events.as_slice(),
+            self.events.as_slice(),
         );
 
         self.reconstructor = Some(reconstructor);
