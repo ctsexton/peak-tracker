@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 /// Returns the size of each bin when dividing the frequency range from
 /// 0 to the nyquist frequency by num_bins;
 /// ```
-/// # use sigmund_rs::utils::frequency_per_bin;
+/// # use core::utils::frequency_per_bin;
 /// assert_eq!(frequency_per_bin(48000.0, 10), 2400.0);
 /// ```
 pub fn frequency_per_bin(sample_rate: f32, num_bins: usize) -> f32 {
@@ -13,7 +13,7 @@ pub fn frequency_per_bin(sample_rate: f32, num_bins: usize) -> f32 {
 
 /// Returns the largest unsigned integer x such that 2**x <= n
 /// ```
-/// # use sigmund_rs::utils::ilog2;
+/// # use core::utils::ilog2;
 /// assert_eq!(ilog2(6), Some(2));
 /// ```
 pub fn ilog2(n: usize) -> Option<usize> {
@@ -31,7 +31,7 @@ pub fn ilog2(n: usize) -> Option<usize> {
 
 /// Rounds n down to the next "floor" that is a power of 2.
 /// ```
-/// # use sigmund_rs::utils::floor_to_power_of_2;
+/// # use core::utils::floor_to_power_of_2;
 /// assert_eq!(floor_to_power_of_2(31), Some(16));
 /// assert_eq!(floor_to_power_of_2(33), Some(32));
 /// ```
@@ -43,8 +43,7 @@ pub fn build_sample(partials: &[(f32, f32, f32)], size: usize, sample_rate: f32)
     let mut sample = vec![0_f32; size];
     for (frequency, amplitude, phase) in partials {
         for (index, x) in sample.iter_mut().enumerate() {
-            *x = *x
-                + amplitude
+            *x += amplitude
                     * (phase * 2. * PI + index as f32 * 2. * PI * frequency / sample_rate).sin()
         }
     }

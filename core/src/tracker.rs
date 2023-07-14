@@ -47,7 +47,7 @@ where
     calculate_peak_distances(a, b, &mut distances);
     distances.sort_unstable_by(|a, b| {
         if let (Some(a), Some(b)) = (a, b) {
-            return a.distance.partial_cmp(&b.distance).unwrap();
+            a.distance.partial_cmp(&b.distance).unwrap()
         } else if let Some(_a) = a {
             return std::cmp::Ordering::Less;
         } else {
@@ -58,17 +58,15 @@ where
     let mut taken_from_a = [false; NPEAKS];
     let mut taken_from_b = [false; NPEAKS];
     let mut match_index = 0;
-    for item in distances.iter() {
-        if let Some(item) = item {
-            if match_index >= matches.len() || item.distance > MAX_DISTANCE {
-                break;
-            }
-            if !taken_from_a[item.a] && !taken_from_b[item.b] {
-                taken_from_a[item.a] = true;
-                taken_from_b[item.b] = true;
-                matches[item.a] = Some(item.b);
-                match_index += 1;
-            }
+    for item in distances.iter().flatten() {
+        if match_index >= matches.len() || item.distance > MAX_DISTANCE {
+            break;
+        }
+        if !taken_from_a[item.a] && !taken_from_b[item.b] {
+            taken_from_a[item.a] = true;
+            taken_from_b[item.b] = true;
+            matches[item.a] = Some(item.b);
+            match_index += 1;
         }
     }
     matches
@@ -76,6 +74,12 @@ where
 
 pub struct PeakTracker {
     peaks: [Option<Peak>; MAX_PEAKS],
+}
+
+impl Default for PeakTracker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PeakTracker {

@@ -1,5 +1,5 @@
 [package]
-name = "peak_tracker_parent"
+name = "peak_tracker_lv2"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,7 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
-[workspace]
-members = ["core", "nih", "nih/xtask", "lv2"]
-
+[dependencies]
+lv2 = { version = "0.6.0", features = [] }
+wmidi = "3.1.0"
+core = { path = "../core" }

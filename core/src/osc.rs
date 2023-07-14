@@ -36,6 +36,7 @@ impl SinOsc {
         self.amplitude = amplitude;
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> f32 {
         let phase = self.phase;
         self.phase = (self.phase + self.frequency) % (2.0 * PI);
@@ -55,15 +56,15 @@ mod test {
     fn test_osc() {
         let mut osc = SinOsc::new(0.25 * PI, 1.0, 0.0);
         assert!(osc.next().abs() < 0.0001);
-        assert!((osc.next() - 0.7071).abs() < 0.0001);
+        assert!((osc.next() - std::f32::consts::FRAC_1_SQRT_2).abs() < 0.0001);
         assert!((osc.next() - 1.0).abs() < 0.0001);
-        assert!((osc.next() - 0.7071).abs() < 0.0001);
+        assert!((osc.next() - std::f32::consts::FRAC_1_SQRT_2).abs() < 0.0001);
         assert!((osc.next() - 0.0).abs() < 0.0001);
-        assert!((osc.next() - -0.7071).abs() < 0.0001);
+        assert!((osc.next() - -std::f32::consts::FRAC_1_SQRT_2).abs() < 0.0001);
         assert!((osc.next() - -1.0).abs() < 0.0001);
 
-        osc.set_frequency_hz(1.0, 48000.0);
-        assert!((osc.frequency - 0.000130).abs() < 0.00001);
+        osc.set_frequency_hz(20.0, 48000.0);
+        assert!((osc.frequency - 0.002618).abs() < 0.00001);
         osc.set_frequency_hz(24000.0, 48000.0);
         assert!((osc.frequency - PI).abs() < 0.00001);
         osc.set_frequency_hz(12000.0, 48000.0);

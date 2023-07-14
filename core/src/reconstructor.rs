@@ -6,6 +6,7 @@ use crate::smooth::SmoothedValue;
 use crate::tracker::PeakTracker;
 use crate::voice::{Event, Note, Synth, Voice};
 use dasp::signal::noise;
+use assert_no_alloc::assert_no_alloc;
 
 #[derive(Debug)]
 struct Smoothers {
@@ -101,7 +102,7 @@ impl ReconstructorVoice {
         transpose: f32,
         detune: f32,
     ) {
-        for (peak, Oscillator { osc, smoothers }) in peaks.iter().zip(self.oscillators.iter_mut()) {
+        for (peak, Oscillator { osc: _, smoothers }) in peaks.iter().zip(self.oscillators.iter_mut()) {
             smoothers.transpose.set_target(transpose);
             smoothers.detune.set_target(detune);
             if !freeze {
@@ -134,7 +135,6 @@ pub struct Reconstructor {
     peak_analyzer: PeakAnalyzer,
     peak_tracker: PeakTracker,
     buffer: Ringbuffer,
-    sample_rate: f32,
     freeze: bool,
     transpose: f32,
     detune: f32,
@@ -165,7 +165,6 @@ impl Reconstructor {
             peak_analyzer,
             peak_tracker,
             buffer,
-            sample_rate,
             freeze,
             transpose,
             detune,
@@ -193,29 +192,31 @@ impl Reconstructor {
     }
 
     pub fn run(&mut self, input: &[f32], output: &mut [f32], events: &[Event]) {
-        assert!(input.len() <= 512 && output.len() == input.len());
-        for sample in input.iter() {
-            self.buffer.write(*sample);
-        }
-        let mut analysis_sample = [0_f32; 512];
-        let mut buffer_reader = self.buffer.get_reader();
-        for sample in analysis_sample.iter_mut() {
-            *sample = buffer_reader.next().unwrap();
-        }
-        let raw_peaks = self.peak_analyzer.get_raw_peaks(&analysis_sample);
-        self.peak_tracker.update_peaks(raw_peaks);
-        let peaks = self.peak_tracker.latest();
-
-        if self.synth_mode {
-            for voice in self.synth.voices.iter_mut() {
-                voice.prepare_oscillators(peaks, self.freeze, self.transpose, self.detune);
+        assert!(output.len() == input.len());
+        assert_no_alloc(|| {
+            for sample in input.iter() {
+                self.buffer.write(*sample);
             }
-            self.synth.render_block(output, events);
-        } else {
-            self.default_voice
-                .prepare_oscillators(peaks, self.freeze, self.transpose, self.detune);
-            self.default_voice.render_block(output);
-        }
+            let mut analysis_sample = [0_f32; 512];
+            let mut buffer_reader = self.buffer.get_reader();
+            for sample in analysis_sample.iter_mut() {
+                *sample = buffer_reader.next().unwrap();
+            }
+            let raw_peaks = self.peak_analyzer.get_raw_peaks(&analysis_sample);
+            self.peak_tracker.update_peaks(raw_peaks);
+            let peaks = self.peak_tracker.latest();
+
+            if self.synth_mode {
+                for voice in self.synth.voices.iter_mut() {
+                    voice.prepare_oscillators(peaks, self.freeze, self.transpose, self.detune);
+                }
+                self.synth.render_block(output, events);
+            } else {
+                self.default_voice
+                    .prepare_oscillators(peaks, self.freeze, self.transpose, self.detune);
+                self.default_voice.render_block(output);
+            }
+        })
     }
 }
 

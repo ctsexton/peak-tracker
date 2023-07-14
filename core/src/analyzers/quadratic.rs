@@ -12,7 +12,7 @@ fn find_bin_freq_quadratic(bins: &[Complex<f32>], bin: usize) -> f32 {
     let next_magnitude = bins[bin + 1].norm();
     let detune = (next_magnitude - previous_magnitude)
         / (2. * (2. * current_magnitude - previous_magnitude - next_magnitude));
-    return bin as f32 + detune;
+    bin as f32 + detune
 }
 
 fn find_top_20_bins(bins: &[Complex<f32>]) -> [Option<(usize, f32)>; MAX_PEAKS] {
@@ -42,7 +42,7 @@ fn find_top_20_bins(bins: &[Complex<f32>]) -> [Option<(usize, f32)>; MAX_PEAKS] 
     }
     peak_bins.sort_unstable_by(|a, b| {
         if a.is_none() {
-            return std::cmp::Ordering::Less;
+            std::cmp::Ordering::Less
         } else if b.is_none() {
             return std::cmp::Ordering::Greater;
         } else {
@@ -52,7 +52,7 @@ fn find_top_20_bins(bins: &[Complex<f32>]) -> [Option<(usize, f32)>; MAX_PEAKS] 
     peak_bins.reverse();
     let mut top_20: [Option<(usize, f32)>; MAX_PEAKS] = [None; MAX_PEAKS];
     top_20.clone_from_slice(&peak_bins[0..MAX_PEAKS]);
-    return top_20;
+    top_20
 }
 
 pub struct PeakAnalyzer {

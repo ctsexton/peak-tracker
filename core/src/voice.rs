@@ -36,9 +36,9 @@ pub trait Voice {
 
     fn matches_note(&self, note_number: u8) -> bool {
         if let Some(note) = &self.get_note() {
-            return note.note_number == note_number;
+            note.note_number == note_number
         } else {
-            return false;
+            false
         }
     }
 }
@@ -48,7 +48,7 @@ pub trait Synth<V: Voice> {
     fn get_voices_mut(&mut self) -> &mut [V];
 
     fn allocate_note(&mut self, note_number: u8, velocity: u8) {
-        if let Some(voice) = self
+        if let Some(_voice) = self
             .get_voices_mut()
             .iter_mut()
             .find(|voice| voice.matches_note(note_number))
