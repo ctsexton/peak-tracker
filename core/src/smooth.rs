@@ -23,14 +23,15 @@ impl SmoothedValue {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> f32 {
-        if self.remaining_steps_to_target <= 0 {
+        if self.remaining_steps_to_target == 0 {
             return self.value;
         }
         let step = (self.target - self.value) / self.remaining_steps_to_target as f32;
-        self.value = self.value + step;
+        self.value += step;
         self.remaining_steps_to_target -= 1;
-        return self.value;
+        self.value
     }
 
     pub fn peek(&self) -> f32 {

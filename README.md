@@ -5,7 +5,7 @@ Attempts to identify strongest frequency partials from an incoming audio stream 
 To build LV2:
 ```
 cd lv2
-cargo build --release 
+cargo +nightly build --release 
 ```
 
 To build CLAP/VST3:

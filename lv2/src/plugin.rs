@@ -55,7 +55,7 @@ impl Plugin for ReconstructorPlugin {
         })
     }
 
-    fn run(&mut self, ports: &mut Ports, features: &mut (), _: u32) {
+    fn run(&mut self, ports: &mut Ports, _features: &mut (), _: u32) {
         for in_copy in self.input.iter_mut() {
             *in_copy = 0.0;
         }
