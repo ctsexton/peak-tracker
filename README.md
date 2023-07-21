@@ -24,4 +24,7 @@ Run tests:
 make test
 ```
 
-CLAP and VST3 plugins will be output to `target/bundled/peak_tracker_nih.<clap/vst3>`.
+To build Mac VST3 installer package:
+```
+make mac_installer
+```
