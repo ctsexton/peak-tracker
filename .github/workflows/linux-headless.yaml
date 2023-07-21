@@ -1,0 +1,48 @@
+name: linux-headless-build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install nightly rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        override: true
+        components: rustfmt, clippy
+    - name: Check
+      uses: actions-rs/cargo@v1
+      with:
+        command: check
+    - name: Lint
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
+        args: --workspace --all-targets --all-features -- -D clippy::all
+    - name: Build LV2
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --verbose --release --manifest-path lv2/Cargo.toml
+    - name: Build CLAP/VST3
+      uses: actions-rs/cargo@v1
+      with:
+        command: run 
+        args: --manifest-path nih/xtask/Cargo.toml --bin xtask bundle peak_tracker_nih --release --verbose
+    - name: Run tests
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --workspace --verbose -- --nocapture
