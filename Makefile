@@ -1,4 +1,4 @@
-.PHONY: all lv2 clap_vst3 clean
+.PHONY: all lv2 clap_vst3 clean test mac_installer
 
 all: lv2 clap_vst3
 
