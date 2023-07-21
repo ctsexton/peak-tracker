@@ -41,3 +41,5 @@ jobs:
       with:
         command: test
         args: --manifest-path core/Cargo.toml --verbose -- --nocapture
+    - name: Build installer
+      run: make mac_installer

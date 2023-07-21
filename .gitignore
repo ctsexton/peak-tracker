@@ -1,1 +1,4 @@
 /target
+PackageRoot/
+PeakTracker.pkg
+PeakTrackerInstaller.pkg
