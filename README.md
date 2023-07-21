@@ -1,4 +1,5 @@
 ![linux-headless](https://github.com/ctsexton/peak-tracker/actions/workflows/linux-headless.yaml/badge.svg)
+![mac-headless](https://github.com/ctsexton/peak-tracker/actions/workflows/mac-headless.yaml/badge.svg)
 # Peak Tracker
 
 Attempts to identify strongest frequency partials from an incoming audio stream and resynthesize them with oscillators. Inspired by Miller Puckette's peak tracking mode in the Pd/Max ~sigmund object.
