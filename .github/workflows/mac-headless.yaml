@@ -1,6 +1,7 @@
 name: mac-headless-build
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
