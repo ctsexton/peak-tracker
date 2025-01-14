@@ -136,7 +136,7 @@ impl Plugin for PeakTracker {
         for in_copy in self.input.iter_mut() {
             *in_copy = 0.0;
         }
-        let input_channel = buffer.as_slice().get(0).unwrap();
+        let input_channel = buffer.as_slice().first().unwrap();
         for (sample, in_copy) in input_channel.iter().zip(self.input.iter_mut()) {
             *in_copy = *sample;
         }
